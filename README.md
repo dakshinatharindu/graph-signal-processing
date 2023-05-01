@@ -1,1 +1,2 @@
-# graph-signal-processing
+# Graph Signal Processing
+## Non-Linear Product Graph
