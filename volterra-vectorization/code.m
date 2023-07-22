@@ -36,14 +36,17 @@ x_sample = x.*J;
 rng('shuffle')
 
 X_unrolled = [zeros(size(x_sample))];
+weight_mu = [1];
 
 for i = 1:num_taps+1
     X_unrolled = [X_unrolled, A_strong^(i-1)*x_sample];
+    weight_mu = [weight_mu, 1];
 end
 
 for k1 = 1:num_taps+1
     for k2 = 1:num_taps+1
         X_unrolled = [X_unrolled, A_strong^(k1-1)*x_sample.*A_strong^(k2-1)*x_sample];
+        weight_mu = [weight_mu, 1/100];
     end
 end
 
@@ -51,6 +54,7 @@ for k1 = 1:num_taps+1
     for k2 = 1:num_taps+1
         for k3 = 1:num_taps+1
             X_unrolled = [X_unrolled, A_strong^(k1-1)*x_sample.*A_strong^(k2-1)*x_sample.*A_strong^(k3-1)*x_sample];
+            weight_mu = [weight_mu, 1/1000];
         end
     end
 end
@@ -58,22 +62,27 @@ end
 x_unrolled_max = max(max(X_unrolled));
 % X_unrolled = X_unrolled/x_unrolled_max;
 
-H = abs(rand(size(X_unrolled, 2),1));
+H = abs(rand(size(X_unrolled, 2),1))/100;
 error = zeros(size(x));
+
 
 % hyperparameters
 % mu = 3e-5;
 epochs = 5e6;
-mu_array = [3e-5, 1e-4, 1e-4, 1e-4, 1e-4];
+mu_array = [7e-4, 2e-3, 7e-3, 7e-3, 7e-3]*0.0001;
+lambda = 1e-8;
 format short g;
 % gradient descent
 for i = 1:epochs
-    error = x - X_unrolled*H;
+    error = x_sample - (X_unrolled*H).*J;
     mu = mu_array(ceil((i/epochs)*length(mu_array)));
-    H = H + mu*(X_unrolled/x_unrolled_max)'*error;
-%     H = max(H, 0);
+    prev_H2_1 = H(2);
+    H = H + mu*(weight_mu').*(X_unrolled/x_unrolled_max)'*error;
+    prev_H2_2 = H(2);
+    H(2) = H(2) - lambda*2*abs(H(2))*(-1)^(H(2)<0);
+    
     if (rem(i,1000)==0)
-        disp([i, norm(error), mu]);
+        disp([i, norm(error), norm(x-X_unrolled*H), prev_H2_2-prev_H2_1, H(2), lambda*2*abs(H(2))*(-1)^(H(2)<0), mu]);
     end
     
 end
