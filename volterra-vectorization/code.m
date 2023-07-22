@@ -16,7 +16,7 @@ num_taps = 2;
 sampling_probability = 0.3;
 
 X = csvread("../volterra-experiments/matlab_code/covid_global.csv",1, 4);
-X = X(1:end, 1:num_time_steps); %306
+X = X(1:end, 101:100+num_time_steps); %306
 x = reshape(X', [size(X, 1)*size(X, 2), 1]);
 x = max(x, 0);
 x_max = max(x);
@@ -69,21 +69,43 @@ error = zeros(size(x));
 % hyperparameters
 % mu = 3e-5;
 epochs = 5e6;
-mu_array = [7e-4, 2e-3, 7e-3, 7e-3, 7e-3]*0.0001;
-lambda = 1e-8;
+mu_array = [7e-4, 2e-3, 2e-3, 2e-3, 2e-3];
+lambda = 1e-5;
 format short g;
+
+% adam
+vt = zeros(size(H));
+st = zeros(size(H));
+eta = 1e-10;
+beta_1 = 0.9;
+beta_2 = 0.999;
+ep = 1e-8;
+cost = 0;
+eta_updt = 0;
+
 % gradient descent
 for i = 1:epochs
     error = x_sample - (X_unrolled*H).*J;
-    mu = mu_array(ceil((i/epochs)*length(mu_array)));
+%     mu = mu_array(ceil((i/epochs)*length(mu_array)));
+    g = (X_unrolled/x_unrolled_max)'*error;
+    vt = beta_1 * vt + (1 - beta_1) * g;
+    st = beta_2 * st + (1 - beta_2) * g.^2;
     prev_H2_1 = H(2);
-    H = H + mu*(weight_mu').*(X_unrolled/x_unrolled_max)'*error;
+    H = H - eta*vt.*g./sqrt(st+ep);
     prev_H2_2 = H(2);
     H(2) = H(2) - lambda*2*abs(H(2))*(-1)^(H(2)<0);
+%     H(3) = H(3) - lambda*2*abs(H(3))*(-1)^(H(3)<0);
+%     H(4) = H(4) - lambda*2*abs(H(4))*(-1)^(H(4)<0);
     
-    if (rem(i,1000)==0)
-        disp([i, norm(error), norm(x-X_unrolled*H), prev_H2_2-prev_H2_1, H(2), lambda*2*abs(H(2))*(-1)^(H(2)<0), mu]);
+    if (rem(i,1)==0)
+        disp([i, norm(error), norm(x-X_unrolled*H), prev_H2_2-prev_H2_1, H(2), lambda*2*abs(H(2))*(-1)^(H(2)<0)]);
     end
+    
+    if ((abs(cost - norm(error)) < 0.001) && (eta_updt == 0))
+        eta = eta * 1e-1;
+        eta_updt = 1;
+    end
+    cost = norm(error);
     
 end
 disp(norm(x-x_sample));
